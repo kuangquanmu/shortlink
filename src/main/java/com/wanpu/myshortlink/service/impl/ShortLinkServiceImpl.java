@@ -1,6 +1,5 @@
 package com.wanpu.myshortlink.service.impl;
 
-import cn.hutool.bloomfilter.BloomFilter;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wanpu.myshortlink.common.constant.RedisKeyConstant;
@@ -11,14 +10,15 @@ import com.wanpu.myshortlink.dao.entity.ShortLinkGoToDO;
 import com.wanpu.myshortlink.dao.mapper.ShortLinkGoToMapper;
 import com.wanpu.myshortlink.dao.mapper.ShortLinkMapper;
 import com.wanpu.myshortlink.dto.req.ShortLinkCreateReqDTO;
+import com.wanpu.myshortlink.dto.req.ShortLinkAccessRecordDTO;
 import com.wanpu.myshortlink.dto.resp.ShortLinkCreateRespDTO;
+import com.wanpu.myshortlink.service.ShortLinkStatsService;
 import com.wanpu.myshortlink.utils.HashUtil;
+import com.wanpu.myshortlink.utils.RequestUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Duration;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import javax.sql.rowset.serial.SerialException;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -26,7 +26,6 @@ import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +41,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
   private final RBloomFilter<String> bloomFilter;
   private final StringRedisTemplate stringRedisTemplate;
   private final RedissonClient redissonClient;
+  private final ShortLinkStatsService shortLinkStatsService;
 
   @Value("${short-link.domain}")
   private String domain;
@@ -94,6 +94,15 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
       return;
     }
 
+    // 用 cookie 做 UV 身份（不存在则下发）
+    String uvId = RequestUtil.getOrSetUvId(request, response);
+    ShortLinkAccessRecordDTO accessRecord =
+        ShortLinkAccessRecordDTO.builder()
+            .ip(RequestUtil.getClientIp(request))
+            .userAgent(request.getHeader("User-Agent"))
+            .referer(request.getHeader("Referer"))
+            .build();
+
     //空值缓存
     String nullFlag = stringRedisTemplate.opsForValue().
         get(RedisKeyConstant.SHORT_LINK_GOTO_IS_NULL_KEY+fullShortUrl);
@@ -108,6 +117,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
         get(RedisKeyConstant.SHORT_LINK_GOTO_KEY+fullShortUrl);
     if(originUrl != null){
       log.debug("[跳转] 缓存命中{}",shortUri);
+      shortLinkStatsService.recordAccess(fullShortUrl, uvId, accessRecord);
       response.sendRedirect(originUrl);
       return;
     }
@@ -120,6 +130,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
       originUrl = stringRedisTemplate.opsForValue()
           .get(RedisKeyConstant.SHORT_LINK_GOTO_KEY + fullShortUrl);
       if(originUrl != null) {  // Redis有缓存直接返回
+        shortLinkStatsService.recordAccess(fullShortUrl, uvId, accessRecord);
         response.sendRedirect(originUrl);
         return;
       }
@@ -139,6 +150,7 @@ public class ShortLinkServiceImpl extends ServiceImpl<ShortLinkMapper,ShortLinkD
           originUrl,
           ttl, TimeUnit.SECONDS
       );
+      shortLinkStatsService.recordAccess(fullShortUrl, uvId, accessRecord);
       response.sendRedirect(originUrl);
     }
     finally{

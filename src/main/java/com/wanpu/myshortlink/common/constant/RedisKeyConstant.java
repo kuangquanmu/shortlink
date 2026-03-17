@@ -21,4 +21,16 @@ public class RedisKeyConstant {
    */
   public static final String SHORT_LINK_GOTO_LOCK_KEY =
       "short_link:lock:goto:";
+
+  /**
+   * UV 去重集合
+   * 完整key格式：short_link:uv:{yyyyMMdd}:{fullShortUrl}
+   */
+  public static final String SHORT_LINK_UV_SET_KEY = "short_link:uv:";
+
+  /**
+   * 按天统计缓存（可选）
+   * 完整key格式：short_link:stats:daily:{yyyyMMdd}:{fullShortUrl}
+   */
+  public static final String SHORT_LINK_STATS_DAILY_KEY = "short_link:stats:daily:";
 }

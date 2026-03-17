@@ -1,6 +1,5 @@
 package com.wanpu.myshortlink.dto.req;
 
-import com.baomidou.mybatisplus.annotation.TableField;
 import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 import lombok.Data;
