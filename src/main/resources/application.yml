@@ -1,0 +1,11 @@
+spring:
+  profiles:
+    active: dev
+  application:
+    name: myshortlink
+server:
+  servlet:
+    context-path: /api/short-link
+management:
+  server:
+    port: 8080
