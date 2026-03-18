@@ -1,6 +1,7 @@
 package com.wanpu.myshortlink.config;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -11,6 +12,7 @@ public class AsyncConfig {
   @Bean(name = "statsTaskExecutor")
   public Executor statsTaskExecutor() {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
     executor.setCorePoolSize(4);
     executor.setMaxPoolSize(16);
     executor.setQueueCapacity(2000);
